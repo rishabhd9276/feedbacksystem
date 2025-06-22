@@ -17,9 +17,17 @@ from pathlib import Path
 
 app = FastAPI()
 
+# Define your allowed origins
+origins = [
+    "http://localhost:5173",  # Your local dev environment
+    "https://feedbacksystem.onrender.com", # Your live backend URL
+    "https://feedback-frontend.onrender.com", # Your live frontend URL
+    # You can add more URLs here if needed
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Or specify ["http://localhost:5173"] for more security
+    allow_origins=origins, 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
