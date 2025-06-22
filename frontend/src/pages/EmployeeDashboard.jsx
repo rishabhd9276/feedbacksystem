@@ -1,19 +1,26 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useContext } from 'react';
 import axios from '../api/axios';
 import FeedbackDetailsModal from '../components/FeedbackDetailsModal';
 import PeerFeedbackForm from '../components/PeerFeedbackForm';
 import AnnouncementList from '../components/AnnouncementList';
 import DocumentUpload from '../components/DocumentUpload';
 import DocumentList from '../components/DocumentList';
+import AssignmentList from '../components/AssignmentList';
+import SubmissionUpload from '../components/SubmissionUpload';
+import { useLocation } from 'react-router-dom';
+import { AuthContext } from '../contexts/AuthContext';
 
 const EmployeeDashboard = () => {
+  const location = useLocation();
   const [timeline, setTimeline] = useState([]);
   const [peerFeedbacks, setPeerFeedbacks] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
   const [documents, setDocuments] = useState([]);
+  const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedFeedback, setSelectedFeedback] = useState(null);
-  const [activeTab, setActiveTab] = useState('manager'); // 'manager', 'peer', 'announcements', or 'documents'
+  const [activeTab, setActiveTab] = useState(location.state?.defaultTab || 'manager');
+  const { user } = useContext(AuthContext);
 
   const fetchTimeline = async () => {
     setLoading(true);
@@ -49,12 +56,28 @@ const EmployeeDashboard = () => {
     }
   };
 
+  const loadAssignments = async () => {
+    try {
+      const res = await axios.get('/assignments/my');
+      setAssignments(res.data);
+    } catch (err) {
+      console.error('Failed to load assignments:', err);
+    }
+  };
+
   useEffect(() => {
     fetchTimeline();
     fetchPeerFeedbacks();
     loadAnnouncements();
     loadDocuments();
+    loadAssignments();
   }, []);
+
+  useEffect(() => {
+    if (location.state?.defaultTab) {
+      setActiveTab(location.state.defaultTab);
+    }
+  }, [location.state]);
 
   const handleAcknowledge = async (id) => {
     await axios.post(`/feedback/${id}/acknowledge`);
@@ -88,6 +111,10 @@ const EmployeeDashboard = () => {
     fetchPeerFeedbacks();
   };
 
+  const handleTabClick = (tabName) => {
+    setActiveTab(tabName);
+  };
+
   if (loading) return <div>Loading...</div>;
 
   return (
@@ -100,7 +127,7 @@ const EmployeeDashboard = () => {
       {/* Tab Navigation */}
       <div style={{ display: 'flex', marginBottom: '1rem', borderBottom: '1px solid #ddd' }}>
         <button 
-          onClick={() => setActiveTab('manager')}
+          onClick={() => handleTabClick('manager')}
           style={{
             padding: '0.5rem 1rem',
             border: 'none',
@@ -113,7 +140,7 @@ const EmployeeDashboard = () => {
           Manager Feedback
         </button>
         <button 
-          onClick={() => setActiveTab('peer')}
+          onClick={() => handleTabClick('peer')}
           style={{
             padding: '0.5rem 1rem',
             border: 'none',
@@ -126,7 +153,7 @@ const EmployeeDashboard = () => {
           Peer Feedback
         </button>
         <button 
-          onClick={() => setActiveTab('announcements')}
+          onClick={() => handleTabClick('announcements')}
           style={{
             padding: '0.5rem 1rem',
             border: 'none',
@@ -139,7 +166,20 @@ const EmployeeDashboard = () => {
           Announcements
         </button>
         <button 
-          onClick={() => setActiveTab('documents')}
+          onClick={() => handleTabClick('assignments')}
+          style={{
+            padding: '0.5rem 1rem',
+            border: 'none',
+            background: activeTab === 'assignments' ? '#007bff' : '#f8f9fa',
+            color: activeTab === 'assignments' ? 'white' : '#333',
+            cursor: 'pointer',
+            borderBottom: activeTab === 'assignments' ? '2px solid #007bff' : 'none'
+          }}
+        >
+          Assignments
+        </button>
+        <button 
+          onClick={() => handleTabClick('documents')}
           style={{
             padding: '0.5rem 1rem',
             border: 'none',
@@ -246,6 +286,18 @@ const EmployeeDashboard = () => {
             announcements={announcements} 
             isManager={false} 
             onUpdate={loadAnnouncements} 
+          />
+        </>
+      )}
+
+      {activeTab === 'assignments' && (
+        <>
+          <h3>My Assignments</h3>
+          <AssignmentList 
+            assignments={assignments} 
+            isManager={false} 
+            onUpdate={loadAssignments} 
+            currentUser={user}
           />
         </>
       )}

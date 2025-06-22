@@ -757,4 +757,611 @@ def delete_document(document_id: int, current_user: models.User = Depends(deps.g
     if not success:
         raise HTTPException(status_code=404, detail="Document not found or not authorized")
     
-    return {"message": "Document deleted successfully"} 
+    return {"message": "Document deleted successfully"}
+
+# --- Assignment Endpoints ---
+@app.post("/assignments/upload", response_model=schemas.AssignmentResponse)
+async def upload_assignment(
+    file: UploadFile = File(...),
+    title: str = Form(...),
+    description: str = Form(None),
+    due_date: str = Form(None),
+    current_user: models.User = Depends(deps.get_current_manager),
+    db: Session = Depends(database.get_db)
+):
+    # Validate file type
+    allowed_types = ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
+                     "text/plain", "image/jpeg", "image/png", "image/gif"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="File type not allowed")
+    
+    # Validate file size (10MB limit)
+    if file.size > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Maximum size is 10MB")
+    
+    # Create uploads directory if it doesn't exist
+    upload_dir = Path("uploads/assignments")
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Generate unique filename
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{timestamp}_{file.filename}"
+    file_path = upload_dir / filename
+    
+    # Save file
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
+    
+    # Parse due date if provided
+    parsed_due_date = None
+    if due_date:
+        try:
+            parsed_due_date = datetime.fromisoformat(due_date.replace('Z', '+00:00'))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid due date format")
+    
+    # Create assignment record
+    assignment_data = {
+        "title": title,
+        "description": description,
+        "filename": filename,
+        "file_path": str(file_path),
+        "file_size": file.size,
+        "mime_type": file.content_type,
+        "due_date": parsed_due_date
+    }
+    
+    db_assignment = crud.create_assignment(db, assignment_data, current_user.id)
+    
+    # Create notifications for all employees in the team
+    employees = crud.get_employees_by_manager(db, current_user.id)
+    for employee in employees:
+        notification_message = f"New assignment uploaded: '{title}'"
+        crud.create_notification(db, user_id=employee.id, message=notification_message)
+    
+    return {
+        "id": db_assignment.id,
+        "manager_id": db_assignment.manager_id,
+        "manager_name": current_user.name,
+        "title": db_assignment.title,
+        "description": db_assignment.description,
+        "filename": db_assignment.filename,
+        "file_size": db_assignment.file_size,
+        "mime_type": db_assignment.mime_type,
+        "due_date": db_assignment.due_date,
+        "created_at": db_assignment.created_at,
+        "updated_at": db_assignment.updated_at,
+        "is_active": db_assignment.is_active,
+        "submission_count": 0
+    }
+
+@app.get("/assignments/team", response_model=List[schemas.AssignmentResponse])
+def get_team_assignments(current_user: models.User = Depends(deps.get_current_manager), db: Session = Depends(database.get_db)):
+    assignments = crud.get_assignments_for_team(db, current_user.id)
+    
+    response_assignments = []
+    for assignment in assignments:
+        # Count submissions for this assignment
+        submissions = crud.get_submissions_for_assignment(db, assignment.id)
+        
+        response_assignments.append({
+            "id": assignment.id,
+            "manager_id": assignment.manager_id,
+            "manager_name": current_user.name,
+            "title": assignment.title,
+            "description": assignment.description,
+            "filename": assignment.filename,
+            "file_size": assignment.file_size,
+            "mime_type": assignment.mime_type,
+            "due_date": assignment.due_date,
+            "created_at": assignment.created_at,
+            "updated_at": assignment.updated_at,
+            "is_active": assignment.is_active,
+            "submission_count": len(submissions)
+        })
+    
+    return response_assignments
+
+@app.get("/assignments/my", response_model=List[schemas.AssignmentResponse])
+def get_my_assignments(current_user: models.User = Depends(deps.get_current_employee), db: Session = Depends(database.get_db)):
+    assignments = crud.get_assignments_for_employee(db, current_user.id)
+    
+    response_assignments = []
+    for assignment in assignments:
+        manager = crud.get_user_by_id(db, assignment.manager_id)
+        response_assignments.append({
+            "id": assignment.id,
+            "manager_id": assignment.manager_id,
+            "manager_name": manager.name if manager else "Unknown Manager",
+            "title": assignment.title,
+            "description": assignment.description,
+            "filename": assignment.filename,
+            "file_size": assignment.file_size,
+            "mime_type": assignment.mime_type,
+            "due_date": assignment.due_date,
+            "created_at": assignment.created_at,
+            "updated_at": assignment.updated_at,
+            "is_active": assignment.is_active,
+            "submission_count": 0  # Employees don't see submission count
+        })
+    
+    return response_assignments
+
+@app.get("/assignments/{assignment_id}", response_model=schemas.AssignmentResponse)
+def get_assignment(assignment_id: int, current_user: models.User = Depends(deps.get_current_user), db: Session = Depends(database.get_db)):
+    assignment = crud.get_assignment_by_id(db, assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    
+    # Check authorization
+    if current_user.role == schemas.RoleEnum.employee:
+        if assignment.manager_id != current_user.manager_id:
+            raise HTTPException(status_code=403, detail="Not authorized to view this assignment")
+    elif current_user.role == schemas.RoleEnum.manager:
+        if assignment.manager_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not authorized to view this assignment")
+    
+    manager = crud.get_user_by_id(db, assignment.manager_id)
+    submissions = crud.get_submissions_for_assignment(db, assignment.id)
+    
+    return {
+        "id": assignment.id,
+        "manager_id": assignment.manager_id,
+        "manager_name": manager.name if manager else "Unknown Manager",
+        "title": assignment.title,
+        "description": assignment.description,
+        "filename": assignment.filename,
+        "file_size": assignment.file_size,
+        "mime_type": assignment.mime_type,
+        "due_date": assignment.due_date,
+        "created_at": assignment.created_at,
+        "updated_at": assignment.updated_at,
+        "is_active": assignment.is_active,
+        "submission_count": len(submissions) if current_user.role == schemas.RoleEnum.manager else 0
+    }
+
+@app.get("/assignments/{assignment_id}/download")
+def download_assignment(assignment_id: int, current_user: models.User = Depends(deps.get_current_user), db: Session = Depends(database.get_db)):
+    assignment = crud.get_assignment_by_id(db, assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    
+    # Check authorization
+    if current_user.role == schemas.RoleEnum.employee:
+        if assignment.manager_id != current_user.manager_id:
+            raise HTTPException(status_code=403, detail="Not authorized to download this assignment")
+    elif current_user.role == schemas.RoleEnum.manager:
+        if assignment.manager_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not authorized to download this assignment")
+    
+    # Check if file exists
+    file_path = Path(assignment.file_path)
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    try:
+        with open(file_path, "rb") as file:
+            content = file.read()
+        
+        return StreamingResponse(
+            io.BytesIO(content),
+            media_type=assignment.mime_type,
+            headers={
+                "Content-Disposition": f"attachment; filename={assignment.filename}",
+                "Content-Length": str(len(content))
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to read file")
+
+@app.patch("/assignments/{assignment_id}", response_model=schemas.AssignmentResponse)
+def update_assignment(assignment_id: int, updates: schemas.AssignmentUpdate, current_user: models.User = Depends(deps.get_current_manager), db: Session = Depends(database.get_db)):
+    assignment = crud.get_assignment_by_id(db, assignment_id)
+    if not assignment or assignment.manager_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Assignment not found or not authorized")
+    
+    updated_assignment = crud.update_assignment(db, assignment, updates)
+    manager = crud.get_user_by_id(db, assignment.manager_id)
+    submissions = crud.get_submissions_for_assignment(db, assignment.id)
+    
+    return {
+        "id": updated_assignment.id,
+        "manager_id": updated_assignment.manager_id,
+        "manager_name": manager.name if manager else "Unknown Manager",
+        "title": updated_assignment.title,
+        "description": updated_assignment.description,
+        "filename": updated_assignment.filename,
+        "file_size": updated_assignment.file_size,
+        "mime_type": updated_assignment.mime_type,
+        "due_date": updated_assignment.due_date,
+        "created_at": updated_assignment.created_at,
+        "updated_at": updated_assignment.updated_at,
+        "is_active": updated_assignment.is_active,
+        "submission_count": len(submissions)
+    }
+
+@app.delete("/assignments/{assignment_id}")
+def delete_assignment(assignment_id: int, current_user: models.User = Depends(deps.get_current_manager), db: Session = Depends(database.get_db)):
+    assignment = crud.get_assignment_by_id(db, assignment_id)
+    if not assignment or assignment.manager_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Assignment not found or not authorized")
+    
+    # Delete file from filesystem
+    file_path = Path(assignment.file_path)
+    if file_path.exists():
+        try:
+            file_path.unlink()
+        except Exception as e:
+            print(f"Failed to delete file: {e}")
+    
+    success = crud.delete_assignment(db, assignment_id, current_user.id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Assignment not found or not authorized")
+    
+    return {"message": "Assignment deleted successfully"}
+
+# --- Submission Endpoints ---
+@app.post("/submissions/upload", response_model=schemas.SubmissionResponse)
+async def upload_submission(
+    file: UploadFile = File(...),
+    assignment_id: int = Form(...),
+    title: str = Form(...),
+    description: str = Form(None),
+    current_user: models.User = Depends(deps.get_current_employee),
+    db: Session = Depends(database.get_db)
+):
+    # Validate file type
+    allowed_types = ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
+                     "text/plain", "image/jpeg", "image/png", "image/gif"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="File type not allowed")
+    
+    # Validate file size (10MB limit)
+    if file.size > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Maximum size is 10MB")
+    
+    # Verify assignment exists and employee has access
+    assignment = crud.get_assignment_by_id(db, assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    
+    if assignment.manager_id != current_user.manager_id:
+        raise HTTPException(status_code=403, detail="Not authorized to submit to this assignment")
+    
+    # Check if employee already submitted
+    existing_submission = crud.get_submission_by_employee_and_assignment(db, current_user.id, assignment_id)
+    if existing_submission:
+        raise HTTPException(status_code=400, detail="You have already submitted for this assignment")
+    
+    # Create uploads directory if it doesn't exist
+    upload_dir = Path("uploads/submissions")
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Generate unique filename
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{timestamp}_{file.filename}"
+    file_path = upload_dir / filename
+    
+    # Save file
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
+    
+    # Create submission record
+    submission_data = {
+        "assignment_id": assignment_id,
+        "title": title,
+        "description": description,
+        "filename": filename,
+        "file_path": str(file_path),
+        "file_size": file.size,
+        "mime_type": file.content_type
+    }
+    
+    db_submission = crud.create_submission(db, submission_data, current_user.id)
+    
+    # Create notification for manager
+    notification_message = f"Employee '{current_user.name}' has submitted work for assignment: '{assignment.title}'"
+    crud.create_notification(db, user_id=assignment.manager_id, message=notification_message)
+    
+    return {
+        "id": db_submission.id,
+        "assignment_id": db_submission.assignment_id,
+        "employee_id": db_submission.employee_id,
+        "employee_name": current_user.name,
+        "title": db_submission.title,
+        "description": db_submission.description,
+        "filename": db_submission.filename,
+        "file_size": db_submission.file_size,
+        "mime_type": db_submission.mime_type,
+        "submitted_at": db_submission.submitted_at,
+        "updated_at": db_submission.updated_at
+    }
+
+@app.get("/submissions/assignment/{assignment_id}", response_model=List[schemas.SubmissionResponse])
+def get_submissions_for_assignment(assignment_id: int, current_user: models.User = Depends(deps.get_current_manager), db: Session = Depends(database.get_db)):
+    # Verify assignment exists and manager has access
+    assignment = crud.get_assignment_by_id(db, assignment_id)
+    if not assignment or assignment.manager_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Assignment not found or not authorized")
+    
+    submissions = crud.get_submissions_for_assignment(db, assignment_id)
+    
+    response_submissions = []
+    for submission in submissions:
+        employee = crud.get_user_by_id(db, submission.employee_id)
+        response_submissions.append({
+            "id": submission.id,
+            "assignment_id": submission.assignment_id,
+            "employee_id": submission.employee_id,
+            "employee_name": employee.name if employee else "Unknown Employee",
+            "title": submission.title,
+            "description": submission.description,
+            "filename": submission.filename,
+            "file_size": submission.file_size,
+            "mime_type": submission.mime_type,
+            "submitted_at": submission.submitted_at,
+            "updated_at": submission.updated_at
+        })
+    
+    return response_submissions
+
+@app.get("/submissions/my", response_model=List[schemas.SubmissionResponse])
+def get_my_submissions(current_user: models.User = Depends(deps.get_current_employee), db: Session = Depends(database.get_db)):
+    submissions = crud.get_submissions_by_employee(db, current_user.id)
+    
+    response_submissions = []
+    for submission in submissions:
+        response_submissions.append({
+            "id": submission.id,
+            "assignment_id": submission.assignment_id,
+            "employee_id": submission.employee_id,
+            "employee_name": current_user.name,
+            "title": submission.title,
+            "description": submission.description,
+            "filename": submission.filename,
+            "file_size": submission.file_size,
+            "mime_type": submission.mime_type,
+            "submitted_at": submission.submitted_at,
+            "updated_at": submission.updated_at
+        })
+    
+    return response_submissions
+
+@app.get("/submissions/{submission_id}", response_model=schemas.SubmissionResponse)
+def get_submission(submission_id: int, current_user: models.User = Depends(deps.get_current_user), db: Session = Depends(database.get_db)):
+    submission = crud.get_submission_by_id(db, submission_id)
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    
+    # Check authorization
+    if current_user.role == schemas.RoleEnum.employee:
+        if submission.employee_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not authorized to view this submission")
+    elif current_user.role == schemas.RoleEnum.manager:
+        assignment = crud.get_assignment_by_id(db, submission.assignment_id)
+        if not assignment or assignment.manager_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not authorized to view this submission")
+    
+    employee = crud.get_user_by_id(db, submission.employee_id)
+    return {
+        "id": submission.id,
+        "assignment_id": submission.assignment_id,
+        "employee_id": submission.employee_id,
+        "employee_name": employee.name if employee else "Unknown Employee",
+        "title": submission.title,
+        "description": submission.description,
+        "filename": submission.filename,
+        "file_size": submission.file_size,
+        "mime_type": submission.mime_type,
+        "submitted_at": submission.submitted_at,
+        "updated_at": submission.updated_at
+    }
+
+@app.get("/submissions/{submission_id}/download")
+def download_submission(submission_id: int, current_user: models.User = Depends(deps.get_current_user), db: Session = Depends(database.get_db)):
+    submission = crud.get_submission_by_id(db, submission_id)
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    
+    # Check authorization
+    if current_user.role == schemas.RoleEnum.employee:
+        if submission.employee_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not authorized to download this submission")
+    elif current_user.role == schemas.RoleEnum.manager:
+        assignment = crud.get_assignment_by_id(db, submission.assignment_id)
+        if not assignment or assignment.manager_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not authorized to download this submission")
+    
+    # Check if file exists
+    file_path = Path(submission.file_path)
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    try:
+        with open(file_path, "rb") as file:
+            content = file.read()
+        
+        return StreamingResponse(
+            io.BytesIO(content),
+            media_type=submission.mime_type,
+            headers={
+                "Content-Disposition": f"attachment; filename={submission.filename}",
+                "Content-Length": str(len(content))
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to read file")
+
+@app.patch("/submissions/{submission_id}", response_model=schemas.SubmissionResponse)
+def update_submission(submission_id: int, updates: schemas.SubmissionUpdate, current_user: models.User = Depends(deps.get_current_employee), db: Session = Depends(database.get_db)):
+    submission = crud.get_submission_by_id(db, submission_id)
+    if not submission or submission.employee_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Submission not found or not authorized")
+    
+    updated_submission = crud.update_submission(db, submission, updates)
+    employee = crud.get_user_by_id(db, submission.employee_id)
+    
+    return {
+        "id": updated_submission.id,
+        "assignment_id": updated_submission.assignment_id,
+        "employee_id": updated_submission.employee_id,
+        "employee_name": employee.name if employee else "Unknown Employee",
+        "title": updated_submission.title,
+        "description": updated_submission.description,
+        "filename": updated_submission.filename,
+        "file_size": updated_submission.file_size,
+        "mime_type": updated_submission.mime_type,
+        "submitted_at": updated_submission.submitted_at,
+        "updated_at": updated_submission.updated_at
+    }
+
+@app.delete("/submissions/{submission_id}")
+def delete_submission(submission_id: int, current_user: models.User = Depends(deps.get_current_employee), db: Session = Depends(database.get_db)):
+    submission = crud.get_submission_by_id(db, submission_id)
+    if not submission or submission.employee_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Submission not found or not authorized")
+    
+    # Delete file from filesystem
+    file_path = Path(submission.file_path)
+    if file_path.exists():
+        try:
+            file_path.unlink()
+        except Exception as e:
+            print(f"Failed to delete file: {e}")
+    
+    success = crud.delete_submission(db, submission_id, current_user.id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Submission not found or not authorized")
+    
+    return {"message": "Submission deleted successfully"}
+
+# --- AssignmentComment Endpoints ---
+@app.post("/assignment-comments/", response_model=schemas.AssignmentCommentResponse)
+def create_assignment_comment(comment: schemas.AssignmentCommentCreate, current_user: models.User = Depends(deps.get_current_user), db: Session = Depends(database.get_db)):
+    # Verify the assignment exists and user has access
+    assignment = crud.get_assignment_by_id(db, comment.assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    
+    # Check if user has access to this assignment
+    if current_user.role == schemas.RoleEnum.employee:
+        # Employee must be in the same team as the assignment manager
+        if current_user.manager_id != assignment.manager_id:
+            raise HTTPException(status_code=403, detail="Not authorized to comment on this assignment")
+    elif current_user.role == schemas.RoleEnum.manager:
+        # Manager must be the creator of the assignment
+        if current_user.id != assignment.manager_id:
+            raise HTTPException(status_code=403, detail="Not authorized to comment on this assignment")
+    
+    # Create the comment
+    db_comment = crud.create_assignment_comment(db, comment, current_user.id)
+    
+    # Create notifications for team members
+    if current_user.role == schemas.RoleEnum.employee:
+        # If employee commented, notify manager and other team members
+        manager = crud.get_user_by_id(db, assignment.manager_id)
+        if manager:
+            crud.create_notification(db, manager.id, f"New comment on assignment '{assignment.title}' by {current_user.name}")
+        
+        # Notify other team members
+        team_members = crud.get_employees_by_manager(db, assignment.manager_id)
+        for member in team_members:
+            if member.id != current_user.id:  # Don't notify self
+                crud.create_notification(db, member.id, f"New comment on assignment '{assignment.title}' by {current_user.name}")
+    else:
+        # If manager commented, notify all team members
+        team_members = crud.get_employees_by_manager(db, current_user.id)
+        for member in team_members:
+            crud.create_notification(db, member.id, f"Manager {current_user.name} commented on assignment '{assignment.title}'")
+    
+    # Return comment with user name
+    return {
+        "id": db_comment.id,
+        "assignment_id": db_comment.assignment_id,
+        "employee_id": db_comment.employee_id,
+        "employee_name": current_user.name,
+        "content": db_comment.content,
+        "created_at": db_comment.created_at,
+        "updated_at": db_comment.updated_at
+    }
+
+@app.get("/assignment-comments/assignment/{assignment_id}", response_model=List[schemas.AssignmentCommentResponse])
+def get_comments_for_assignment(assignment_id: int, current_user: models.User = Depends(deps.get_current_user), db: Session = Depends(database.get_db)):
+    # Verify assignment exists and user has access
+    assignment = crud.get_assignment_by_id(db, assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    
+    # Check if user has access to this assignment
+    if current_user.role == schemas.RoleEnum.employee:
+        if current_user.manager_id != assignment.manager_id:
+            raise HTTPException(status_code=403, detail="Not authorized to view this assignment")
+    elif current_user.role == schemas.RoleEnum.manager:
+        if current_user.id != assignment.manager_id:
+            raise HTTPException(status_code=403, detail="Not authorized to view this assignment")
+    
+    # Get comments with employee names
+    comments = crud.get_comments_for_assignment(db, assignment_id)
+    result = []
+    for comment in comments:
+        employee = crud.get_user_by_id(db, comment.employee_id)
+        result.append({
+            "id": comment.id,
+            "assignment_id": comment.assignment_id,
+            "employee_id": comment.employee_id,
+            "employee_name": employee.name if employee else "Unknown",
+            "content": comment.content,
+            "created_at": comment.created_at,
+            "updated_at": comment.updated_at
+        })
+    
+    return result
+
+@app.put("/assignment-comments/{comment_id}", response_model=schemas.AssignmentCommentResponse)
+def update_assignment_comment(comment_id: int, updates: schemas.AssignmentCommentUpdate, current_user: models.User = Depends(deps.get_current_user), db: Session = Depends(database.get_db)):
+    # Get the comment
+    comment = crud.get_assignment_comment_by_id(db, comment_id)
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    
+    # Check if user owns the comment
+    if comment.employee_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this comment")
+    
+    # Update the comment
+    updated_comment = crud.update_assignment_comment(db, comment, updates)
+    
+    # Return with user name
+    return {
+        "id": updated_comment.id,
+        "assignment_id": updated_comment.assignment_id,
+        "employee_id": updated_comment.employee_id,
+        "employee_name": current_user.name,
+        "content": updated_comment.content,
+        "created_at": updated_comment.created_at,
+        "updated_at": updated_comment.updated_at
+    }
+
+@app.delete("/assignment-comments/{comment_id}")
+def delete_assignment_comment(comment_id: int, current_user: models.User = Depends(deps.get_current_user), db: Session = Depends(database.get_db)):
+    # Get the comment
+    comment = crud.get_assignment_comment_by_id(db, comment_id)
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    
+    # Check if user owns the comment
+    if comment.employee_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this comment")
+    
+    # Delete the comment
+    success = crud.delete_assignment_comment(db, comment_id, current_user.id)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to delete comment")
+    
+    return {"message": "Comment deleted successfully"}

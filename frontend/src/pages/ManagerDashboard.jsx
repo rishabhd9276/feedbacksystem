@@ -5,6 +5,9 @@ import FeedbackForm from '../components/FeedbackForm';
 import AnnouncementForm from '../components/AnnouncementForm';
 import AnnouncementList from '../components/AnnouncementList';
 import DocumentList from '../components/DocumentList';
+import AssignmentUpload from '../components/AssignmentUpload';
+import AssignmentList from '../components/AssignmentList';
+import SubmissionList from '../components/SubmissionList';
 
 const FeedbackHistoryItem = ({ feedback, onUpdate }) => {
   const [editing, setEditing] = useState(false);
@@ -67,6 +70,9 @@ const ManagerDashboard = () => {
   const [feedbacks, setFeedbacks] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
   const [documents, setDocuments] = useState([]);
+  const [assignments, setAssignments] = useState([]);
+  const [selectedAssignment, setSelectedAssignment] = useState(null);
+  const [submissions, setSubmissions] = useState([]);
   const [activeTab, setActiveTab] = useState('dashboard');
 
   useEffect(() => {
@@ -74,6 +80,7 @@ const ManagerDashboard = () => {
     axios.get('/users/team').then(res => setTeam(res.data));
     loadAnnouncements();
     loadDocuments();
+    loadAssignments();
   }, []);
 
   const loadAnnouncements = async () => {
@@ -94,10 +101,33 @@ const ManagerDashboard = () => {
     }
   };
 
+  const loadAssignments = async () => {
+    try {
+      const res = await axios.get('/assignments/team');
+      setAssignments(res.data);
+    } catch (err) {
+      console.error('Failed to load assignments:', err);
+    }
+  };
+
+  const loadSubmissions = async (assignmentId) => {
+    try {
+      const res = await axios.get(`/submissions/assignment/${assignmentId}`);
+      setSubmissions(res.data);
+    } catch (err) {
+      console.error('Failed to load submissions:', err);
+    }
+  };
+
   const selectMember = async (member) => {
     setSelected(member);
     const res = await axios.get(`/feedback/employee/${member.id}`);
     setFeedbacks(res.data);
+  };
+
+  const selectAssignment = async (assignment) => {
+    setSelectedAssignment(assignment);
+    await loadSubmissions(assignment.id);
   };
 
   const refreshFeedbacks = async () => {
@@ -151,6 +181,12 @@ const ManagerDashboard = () => {
           Dashboard
         </button>
         <button 
+          className={activeTab === 'assignments' ? 'active' : ''} 
+          onClick={() => setActiveTab('assignments')}
+        >
+          Assignments
+        </button>
+        <button 
           className={activeTab === 'announcements' ? 'active' : ''} 
           onClick={() => setActiveTab('announcements')}
         >
@@ -200,6 +236,32 @@ const ManagerDashboard = () => {
                   <FeedbackHistoryItem key={fb.id} feedback={fb} onUpdate={refreshFeedbacks} />
                 ))}
               </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Assignments Tab */}
+      {activeTab === 'assignments' && (
+        <div>
+          <h3>Team Assignments</h3>
+          <AssignmentUpload onSuccess={loadAssignments} />
+          
+          <h4>Current Assignments</h4>
+          <AssignmentList 
+            assignments={assignments} 
+            isManager={true} 
+            onUpdate={loadAssignments} 
+            currentUser={user}
+          />
+          
+          {selectedAssignment && (
+            <div style={{ marginTop: '2rem' }}>
+              <h4>Submissions for: {selectedAssignment.title}</h4>
+              <SubmissionList 
+                submissions={submissions} 
+                onUpdate={() => loadSubmissions(selectedAssignment.id)} 
+              />
             </div>
           )}
         </div>

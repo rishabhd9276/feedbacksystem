@@ -181,4 +181,86 @@ class DocumentResponse(DocumentBase):
         orm_mode = True
         json_encoders = {
             datetime: lambda v: v.isoformat() if v else None
+        }
+
+class AssignmentBase(BaseModel):
+    title: str
+    description: Optional[str] = None
+    due_date: Optional[datetime] = None
+
+class AssignmentCreate(AssignmentBase):
+    pass
+
+class AssignmentUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    due_date: Optional[datetime] = None
+    is_active: Optional[bool] = None
+
+class AssignmentResponse(AssignmentBase):
+    id: int
+    manager_id: int
+    manager_name: str
+    filename: str
+    file_size: int
+    mime_type: str
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
+    is_active: bool
+    submission_count: Optional[int] = 0
+    
+    class Config:
+        orm_mode = True
+        json_encoders = {
+            datetime: lambda v: v.isoformat() if v else None
+        }
+
+class SubmissionBase(BaseModel):
+    title: str
+    description: Optional[str] = None
+
+class SubmissionCreate(SubmissionBase):
+    assignment_id: int
+
+class SubmissionUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+
+class SubmissionResponse(SubmissionBase):
+    id: int
+    assignment_id: int
+    employee_id: int
+    employee_name: str
+    filename: str
+    file_size: int
+    mime_type: str
+    submitted_at: Optional[datetime]
+    updated_at: Optional[datetime]
+    
+    class Config:
+        orm_mode = True
+        json_encoders = {
+            datetime: lambda v: v.isoformat() if v else None
         } 
+class AssignmentCommentBase(BaseModel):
+    content: str
+
+class AssignmentCommentCreate(AssignmentCommentBase):
+    assignment_id: int
+
+class AssignmentCommentUpdate(BaseModel):
+    content: str
+
+class AssignmentCommentResponse(AssignmentCommentBase):
+    id: int
+    assignment_id: int
+    employee_id: int
+    employee_name: str
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
+    
+    class Config:
+        orm_mode = True
+        json_encoders = {
+            datetime: lambda v: v.isoformat() if v else None
+        }

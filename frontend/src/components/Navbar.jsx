@@ -10,10 +10,14 @@ const Navbar = () => {
   const [showNotifications, setShowNotifications] = useState(false);
 
   useEffect(() => {
-    if (user?.role === 'manager') {
+    if (user?.role === 'manager' || user?.role === 'employee') {
       const fetchNotifications = async () => {
-        const res = await axios.get('/notifications');
-        setNotifications(res.data);
+        try {
+            const res = await axios.get('/notifications');
+            setNotifications(res.data);
+        } catch (err) {
+            console.error("Failed to fetch notifications:", err)
+        }
       };
       fetchNotifications();
       const interval = setInterval(fetchNotifications, 60000); // Poll every minute
@@ -28,9 +32,15 @@ const Navbar = () => {
   
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
-  const markAsRead = async (id) => {
-    await axios.post(`/notifications/${id}/read`);
-    setNotifications(notifications.map(n => n.id === id ? { ...n, is_read: true } : n));
+  const handleNotificationClick = async (notification) => {
+    if (!notification.is_read) {
+      await axios.post(`/notifications/${notification.id}/read`);
+      setNotifications(notifications.map(n => n.id === notification.id ? { ...n, is_read: true } : n));
+    }
+    setShowNotifications(false);
+    if (user?.role === 'employee') {
+      navigate('/employee', { state: { defaultTab: 'announcements' } });
+    }
   };
 
   if (!user) return null;
@@ -43,10 +53,15 @@ const Navbar = () => {
       {user.role === 'manager' && <Link to="/manager">Dashboard</Link>}
       {user.role === 'employee' && <Link to="/employee">Dashboard</Link>}
       
-      {user.role === 'manager' && (
+      {(user.role === 'manager' || user.role === 'employee') && (
         <div className="notification-container">
           <button className="notification-bell" onClick={() => setShowNotifications(!showNotifications)}>
-            &#128276; {unreadCount > 0 && <span className="notification-count">{unreadCount}</span>}
+            &#128276; 
+            {unreadCount > 0 && (
+                <span className="notification-count">
+                    {user.role === 'manager' ? unreadCount : "New"}
+                </span>
+            )}
           </button>
           {showNotifications && (
             <div className="notification-dropdown">
@@ -54,7 +69,7 @@ const Navbar = () => {
                 <div className="notification-item">No notifications</div>
               ) : (
                 notifications.map(n => (
-                  <div key={n.id} className={`notification-item ${n.is_read ? 'read' : ''}`} onClick={() => !n.is_read && markAsRead(n.id)}>
+                  <div key={n.id} className={`notification-item ${n.is_read ? 'read' : ''}`} onClick={() => handleNotificationClick(n)}>
                     {n.message}
                     <span className="notification-date">{new Date(n.created_at).toLocaleString()}</span>
                   </div>
