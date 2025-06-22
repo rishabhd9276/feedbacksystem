@@ -19,10 +19,10 @@ app = FastAPI()
 
 # Define your allowed origins
 origins = [
-    "http://localhost:5173",  # Your local dev environment
-    "https://feedbacksystem.onrender.com", # Your live backend URL
-    "https://feedback-frontend.onrender.com", # Your live frontend URL
-    # You can add more URLs here if needed
+    "http://localhost:5173",                      # For local development
+    "https://feedbacksystem-1-4447.onrender.com", # The ACTUAL live frontend URL
+    "https://feedback-frontend.onrender.com",    # The PREDICTED frontend URL (good to keep)
+    "https://feedbacksystem-86zx.onrender.com",  # The live backend URL
 ]
 
 app.add_middleware(
