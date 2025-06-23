@@ -8,6 +8,7 @@ import DocumentList from '../components/DocumentList';
 import AssignmentUpload from '../components/AssignmentUpload';
 import AssignmentList from '../components/AssignmentList';
 import SubmissionList from '../components/SubmissionList';
+import { Tabs, Tab, Box, Paper, Card, CardContent, List, ListItem, ListItemButton, ListItemText, Button, Typography, Divider, Stack } from '@mui/material';
 
 const FeedbackHistoryItem = ({ feedback, onUpdate }) => {
   const [editing, setEditing] = useState(false);
@@ -73,42 +74,42 @@ const ManagerDashboard = () => {
   const [assignments, setAssignments] = useState([]);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
   const [submissions, setSubmissions] = useState([]);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('team');
 
-  useEffect(() => {
-    axios.get('/dashboard/manager').then(res => setDashboard(res.data));
-    axios.get('/users/team').then(res => setTeam(res.data));
-    loadAnnouncements();
-    loadDocuments();
-    loadAssignments();
-  }, []);
-
-  const loadAnnouncements = async () => {
-    try {
-      const res = await axios.get('/announcements/team');
-      setAnnouncements(res.data);
-    } catch (err) {
-      console.error('Failed to load announcements:', err);
-    }
-  };
-
-  const loadDocuments = async () => {
-    try {
-      const res = await axios.get('/documents/team');
-      setDocuments(res.data);
-    } catch (err) {
-      console.error('Failed to load documents:', err);
-    }
-  };
-
-  const loadAssignments = async () => {
+  const fetchAssignments = async () => {
     try {
       const res = await axios.get('/assignments/team');
       setAssignments(res.data);
     } catch (err) {
-      console.error('Failed to load assignments:', err);
+      console.error("Failed to fetch assignments", err);
     }
   };
+
+  const fetchAnnouncements = async () => {
+    try {
+      const res = await axios.get('/announcements/team');
+      setAnnouncements(res.data);
+    } catch (err) {
+      console.error("Failed to fetch announcements", err);
+    }
+  };
+
+  const fetchDocuments = async () => {
+    try {
+      const res = await axios.get('/documents/team');
+      setDocuments(res.data);
+    } catch (err) {
+      console.error("Failed to fetch documents", err);
+    }
+  };
+
+  useEffect(() => {
+    axios.get('/dashboard/manager').then(res => setDashboard(res.data));
+    axios.get('/users/team').then(res => setTeam(res.data));
+    fetchAnnouncements();
+    fetchDocuments();
+    fetchAssignments();
+  }, []);
 
   const loadSubmissions = async (assignmentId) => {
     try {
@@ -166,134 +167,113 @@ const ManagerDashboard = () => {
     }
   };
 
-  if (!dashboard) return <div>Loading...</div>;
+  if (!dashboard) return <Box p={4}><Typography>Loading...</Typography></Box>;
 
   return (
-    <div className="dashboard-container">
-      <h2>Manager Dashboard</h2>
-      
-      {/* Tab Navigation */}
-      <div className="tab-navigation">
-        <button 
-          className={activeTab === 'dashboard' ? 'active' : ''} 
-          onClick={() => setActiveTab('dashboard')}
+    <Box sx={{ maxWidth: 1100, mx: 'auto', mt: 4 }}>
+      <Typography variant="h4" gutterBottom>Manager Dashboard</Typography>
+      <Paper elevation={2} sx={{ mb: 3 }}>
+        <Tabs
+          value={activeTab}
+          onChange={(_, v) => setActiveTab(v)}
+          indicatorColor="primary"
+          textColor="primary"
+          variant="scrollable"
+          scrollButtons="auto"
         >
-          Dashboard
-        </button>
-        <button 
-          className={activeTab === 'assignments' ? 'active' : ''} 
-          onClick={() => setActiveTab('assignments')}
-        >
-          Assignments
-        </button>
-        <button 
-          className={activeTab === 'announcements' ? 'active' : ''} 
-          onClick={() => setActiveTab('announcements')}
-        >
-          Announcements
-        </button>
-        <button 
-          className={activeTab === 'documents' ? 'active' : ''} 
-          onClick={() => setActiveTab('documents')}
-        >
-          Team Documents
-        </button>
-      </div>
+          <Tab label="Team" value="team" />
+          <Tab label="Assignments" value="assignments" />
+          <Tab label="Announcements" value="announcements" />
+          <Tab label="Team Documents" value="documents" />
+        </Tabs>
+      </Paper>
 
       {/* Dashboard Tab */}
-      {activeTab === 'dashboard' && (
-        <div>
-          <div>
-            <strong>Team Size:</strong> {dashboard.team_size}<br />
-            <strong>Feedback Count:</strong> {dashboard.feedback_count}<br />
-            <strong>Sentiment Trends:</strong>
-            <div style={{ display: 'flex', gap: '1rem', margin: '1rem 0' }}>
-              {Object.entries(dashboard.sentiment_trends).map(([sentiment, count]) => (
-                <div key={sentiment} style={{ background: '#f1f3f6', borderRadius: 10, padding: '1rem 2rem', minWidth: 120, textAlign: 'center' }}>
-                  {sentiment}: {count}
-                </div>
-              ))}
-            </div>
-          </div>
-          <h3>Team Members</h3>
-          <ul>
-            {team.map(member => (
-              <li key={member.id}>
-                <button onClick={() => selectMember(member)}>{member.name} ({member.email})</button>
-              </li>
-            ))}
-          </ul>
-          {selected && (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h4>Feedback for {selected.name}</h4>
-                <button onClick={handleExportAllPdf}>Export All as PDF</button>
-              </div>
-              <FeedbackForm employeeId={selected.id} onSuccess={refreshFeedbacks} />
-              <h5>Feedback History</h5>
-              <ul>
-                {feedbacks.map(fb => (
-                  <FeedbackHistoryItem key={fb.id} feedback={fb} onUpdate={refreshFeedbacks} />
+      {activeTab === 'team' && (
+        <Box>
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Typography><strong>Team Size:</strong> {dashboard.team_size}</Typography>
+              <Typography><strong>Feedback Count:</strong> {dashboard.feedback_count}</Typography>
+              <Typography><strong>Sentiment Trends:</strong></Typography>
+              <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
+                {Object.entries(dashboard.sentiment_trends).map(([sentiment, count]) => (
+                  <Paper key={sentiment} sx={{ p: 2, minWidth: 120, textAlign: 'center', bgcolor: '#f1f3f6' }}>
+                    <Typography>{sentiment}: {count}</Typography>
+                  </Paper>
                 ))}
-              </ul>
-            </div>
+              </Stack>
+            </CardContent>
+          </Card>
+          <Typography variant="h6">Team Members</Typography>
+          <List>
+            {team.map(member => (
+              <ListItem key={member.id} disablePadding>
+                <ListItemButton onClick={() => selectMember(member)}>
+                  <ListItemText primary={`${member.name} (${member.email})`} />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
+          {selected && (
+            <Box mt={3}>
+              <Box display="flex" justifyContent="space-between" alignItems="center">
+                <Typography variant="h6">Feedback for {selected.name}</Typography>
+                <Button variant="outlined" onClick={handleExportAllPdf}>Export All as PDF</Button>
+              </Box>
+              <FeedbackForm employeeId={selected.id} onSuccess={refreshFeedbacks} />
+              <Typography variant="subtitle1" sx={{ mt: 2 }}>Feedback History</Typography>
+              <List>
+                {feedbacks.map(fb => (
+                  <ListItem key={fb.id} disablePadding>
+                    <FeedbackHistoryItem feedback={fb} onUpdate={refreshFeedbacks} />
+                  </ListItem>
+                ))}
+              </List>
+            </Box>
           )}
-        </div>
+        </Box>
       )}
 
       {/* Assignments Tab */}
       {activeTab === 'assignments' && (
-        <div>
-          <h3>Team Assignments</h3>
-          <AssignmentUpload onSuccess={loadAssignments} />
-          
-          <h4>Current Assignments</h4>
-          <AssignmentList 
-            assignments={assignments} 
-            isManager={true} 
-            onUpdate={loadAssignments} 
-            currentUser={user}
-          />
-          
+        <Box>
+          <Typography variant="h6" mb={2}>Upload New Assignment</Typography>
+          <AssignmentUpload onUploadSuccess={fetchAssignments} />
+          <Divider sx={{ my: 3 }} />
+          <Typography variant="h6" mb={2}>Current Assignments</Typography>
+          <AssignmentList assignments={assignments} onUpdate={fetchAssignments} />
           {selectedAssignment && (
-            <div style={{ marginTop: '2rem' }}>
-              <h4>Submissions for: {selectedAssignment.title}</h4>
+            <Box mt={4}>
+              <Typography variant="subtitle1">Submissions for: {selectedAssignment.title}</Typography>
               <SubmissionList 
                 submissions={submissions} 
                 onUpdate={() => loadSubmissions(selectedAssignment.id)} 
               />
-            </div>
+            </Box>
           )}
-        </div>
+        </Box>
       )}
 
       {/* Announcements Tab */}
       {activeTab === 'announcements' && (
-        <div>
-          <h3>Team Announcements</h3>
-          <AnnouncementForm onSuccess={loadAnnouncements} />
-          <h4>Recent Announcements</h4>
-          <AnnouncementList 
-            announcements={announcements} 
-            isManager={true} 
-            onUpdate={loadAnnouncements} 
-          />
-        </div>
+        <Box>
+          <Typography variant="h6" mb={2}>Create New Announcement</Typography>
+          <AnnouncementForm onNewAnnouncement={fetchAnnouncements} />
+          <Divider sx={{ my: 3 }} />
+          <Typography variant="h6" mb={2}>Past Announcements</Typography>
+          <AnnouncementList announcements={announcements} onUpdate={fetchAnnouncements}/>
+        </Box>
       )}
 
       {/* Documents Tab */}
       {activeTab === 'documents' && (
-        <div>
-          <h3>Team Documents</h3>
-          <p>Documents shared by your team members:</p>
-          <DocumentList 
-            documents={documents} 
-            isManager={true} 
-            onUpdate={loadDocuments} 
-          />
-        </div>
+        <Box>
+          <Typography variant="h6" mb={2}>Team Documents</Typography>
+          <DocumentList documents={documents} onUpdate={fetchDocuments}/>
+        </Box>
       )}
-    </div>
+    </Box>
   );
 };
 

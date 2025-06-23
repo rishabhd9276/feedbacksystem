@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import axios from '../api/axios';
 
-const AnnouncementForm = ({ onSuccess }) => {
+const AnnouncementForm = ({ onNewAnnouncement }) => {
   const [form, setForm] = useState({
     title: '',
     content: ''
   });
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -15,52 +14,42 @@ const AnnouncementForm = ({ onSuccess }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setLoading(true);
-
     try {
       await axios.post('/announcements/', form);
       setForm({ title: '', content: '' });
-      onSuccess();
+      if (onNewAnnouncement) {
+        onNewAnnouncement();
+      }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to create announcement');
-    } finally {
-      setLoading(false);
+      setError('Failed to create announcement');
     }
   };
 
   return (
     <div className="announcement-form">
       <h3>Create New Announcement</h3>
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label htmlFor="title">Title:</label>
+      <form onSubmit={handleSubmit} className="mb-4 space-y-2">
           <input
             type="text"
-            id="title"
             name="title"
             value={form.title}
             onChange={handleChange}
+          placeholder="Title"
+          className="w-full p-2 border rounded"
             required
-            placeholder="Enter announcement title"
           />
-        </div>
-        <div>
-          <label htmlFor="content">Content:</label>
           <textarea
-            id="content"
             name="content"
             value={form.content}
             onChange={handleChange}
+          placeholder="Content"
+          className="w-full p-2 border rounded"
             required
-            placeholder="Enter announcement content"
-            rows="4"
-          />
-        </div>
-        <button type="submit" disabled={loading}>
-          {loading ? 'Creating...' : 'Create Announcement'}
+        ></textarea>
+        <button type="submit" className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+          Create
         </button>
-        {error && <div className="error">{error}</div>}
+        {error && <p className="text-red-500">{error}</p>}
       </form>
     </div>
   );

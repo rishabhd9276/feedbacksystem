@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import axios from '../api/axios';
-import './AssignmentCommentSection.css';
+import { Card, CardContent, TextField, Button, Typography, Stack, Box, Divider } from '@mui/material';
+import { toast } from 'react-toastify';
 
 const AssignmentCommentSection = ({ assignmentId, currentUser }) => {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const [editingComment, setEditingComment] = useState(null);
   const [editContent, setEditContent] = useState('');
 
@@ -21,27 +21,24 @@ const AssignmentCommentSection = ({ assignmentId, currentUser }) => {
       const response = await axios.get(`/assignment-comments/assignment/${assignmentId}`);
       setComments(response.data);
     } catch (err) {
-      setError('Failed to load comments');
+      toast.error('Failed to load comments');
     }
   };
 
   const handleSubmitComment = async (e) => {
     e.preventDefault();
     if (!newComment.trim()) return;
-
     setLoading(true);
-    setError('');
-
     try {
       await axios.post('/assignment-comments/', {
         assignment_id: assignmentId,
         content: newComment.trim()
       });
-
       setNewComment('');
       fetchComments();
+      toast.success('Comment posted!');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to post comment');
+      toast.error(err.response?.data?.detail || 'Failed to post comment');
     } finally {
       setLoading(false);
     }
@@ -49,28 +46,27 @@ const AssignmentCommentSection = ({ assignmentId, currentUser }) => {
 
   const handleEditComment = async (commentId) => {
     if (!editContent.trim()) return;
-
     try {
       await axios.put(`/assignment-comments/${commentId}`, {
         content: editContent.trim()
       });
-
       setEditingComment(null);
       setEditContent('');
       fetchComments();
+      toast.success('Comment updated!');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to update comment');
+      toast.error(err.response?.data?.detail || 'Failed to update comment');
     }
   };
 
   const handleDeleteComment = async (commentId) => {
     if (!window.confirm('Are you sure you want to delete this comment?')) return;
-
     try {
       await axios.delete(`/assignment-comments/${commentId}`);
       fetchComments();
+      toast.success('Comment deleted!');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to delete comment');
+      toast.error(err.response?.data?.detail || 'Failed to delete comment');
     }
   };
 
@@ -89,83 +85,89 @@ const AssignmentCommentSection = ({ assignmentId, currentUser }) => {
   };
 
   return (
-    <div className="assignment-comment-section">
-      <h3>Comments & Questions</h3>
-      
-      {error && <div className="error-message">{error}</div>}
-      
-      {/* Add new comment */}
-      <form onSubmit={handleSubmitComment} className="comment-form">
-        <textarea
-          value={newComment}
-          onChange={(e) => setNewComment(e.target.value)}
-          placeholder="Share your thoughts, ask questions, or provide clarifications about this assignment..."
-          rows="3"
-          required
-        />
-        <button type="submit" disabled={loading || !newComment.trim()}>
-          {loading ? 'Posting...' : 'Post Comment'}
-        </button>
-      </form>
-
-      {/* Comments list */}
-      <div className="comments-list">
-        {comments.length === 0 ? (
-          <p className="no-comments">No comments yet. Be the first to start the discussion!</p>
-        ) : (
-          comments.map((comment) => (
-            <div key={comment.id} className="comment-item">
-              <div className="comment-header">
-                <span className="comment-author">{comment.employee_name}</span>
-                <span className="comment-date">{formatDate(comment.created_at)}</span>
-                {comment.updated_at && comment.updated_at !== comment.created_at && (
-                  <span className="comment-edited">(edited)</span>
-                )}
-              </div>
-              
-              {editingComment === comment.id ? (
-                <div className="comment-edit-form">
-                  <textarea
-                    value={editContent}
-                    onChange={(e) => setEditContent(e.target.value)}
-                    rows="3"
-                  />
-                  <div className="edit-actions">
-                    <button 
-                      onClick={() => handleEditComment(comment.id)}
-                      disabled={!editContent.trim()}
-                    >
-                      Save
-                    </button>
-                    <button onClick={cancelEditing}>Cancel</button>
-                  </div>
-                </div>
-              ) : (
-                <div className="comment-content">
-                  <p>{comment.content}</p>
-                  {currentUser && comment.employee_id === currentUser.id && (
-                    <div className="comment-actions">
-                      <button 
-                        onClick={() => startEditing(comment)}
-                        className="edit-btn"
-                      >
-                        Edit
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteComment(comment.id)}
-                        className="delete-btn"
-                      >
-                        Delete
-                      </button>
-                    </div>
+    <Card sx={{ mt: 3 }}>
+      <CardContent>
+        <Typography variant="h6" gutterBottom>Comments & Questions</Typography>
+        <Box component="form" onSubmit={handleSubmitComment} mb={2}>
+          <Stack spacing={2}>
+            <TextField
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              placeholder="Share your thoughts, ask questions, or provide clarifications about this assignment..."
+              multiline
+              rows={3}
+              required
+              fullWidth
+            />
+            <Button type="submit" variant="contained" disabled={loading || !newComment.trim()}>
+              {loading ? 'Posting...' : 'Post Comment'}
+            </Button>
+          </Stack>
+        </Box>
+        <Divider sx={{ mb: 2 }} />
+        <Box>
+          {comments.length === 0 ? (
+            <Typography color="text.secondary">No comments yet. Be the first to start the discussion!</Typography>
+          ) : (
+            <Stack spacing={2}>
+              {comments.map((comment) => (
+                <Box key={comment.id} sx={{ bgcolor: '#f8f9fa', borderRadius: 2, p: 2 }}>
+                  <Box display="flex" justifyContent="space-between" alignItems="center">
+                    <Typography fontWeight={600}>{comment.employee_name}</Typography>
+                    <Typography variant="caption" color="text.secondary">{formatDate(comment.created_at)}{comment.updated_at && comment.updated_at !== comment.created_at && ' (edited)'}</Typography>
+                  </Box>
+                  {editingComment === comment.id ? (
+                    <Box mt={1}>
+                      <TextField
+                        value={editContent}
+                        onChange={(e) => setEditContent(e.target.value)}
+                        multiline
+                        rows={3}
+                        fullWidth
+                      />
+                      <Stack direction="row" spacing={1} mt={1}>
+                        <Button 
+                          onClick={() => handleEditComment(comment.id)}
+                          disabled={!editContent.trim()}
+                          variant="contained"
+                          size="small"
+                        >
+                          Save
+                        </Button>
+                        <Button onClick={cancelEditing} variant="outlined" size="small">Cancel</Button>
+                      </Stack>
+                    </Box>
+                  ) : (
+                    <Box mt={1}>
+                      <Typography>{comment.content}</Typography>
+                      {currentUser && comment.employee_id === currentUser.id && (
+                        <Stack direction="row" spacing={1} mt={1}>
+                          <Button 
+                            onClick={() => startEditing(comment)}
+                            variant="outlined"
+                            size="small"
+                          >
+                            Edit
+                          </Button>
+                          <Button 
+                            onClick={() => handleDeleteComment(comment.id)}
+                            color="error"
+                            variant="outlined"
+                            size="small"
+                          >
+                            Delete
+                          </Button>
+                        </Stack>
+                      )}
+                    </Box>
                   )}
-                </div>
-              )}
-            </div>
-          ))
-        )}
-      </div>
-    </div>
+                </Box>
+              ))}
+            </Stack>
+          )}
+        </Box>
+      </CardContent>
+    </Card>
   );
 };
 

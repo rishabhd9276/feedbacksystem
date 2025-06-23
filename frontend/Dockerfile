@@ -3,11 +3,13 @@ FROM node:18-alpine as build
 
 WORKDIR /app
 
-# Copy package files
+# Copy package.json and package-lock.json
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Clean install of dependencies
+# Using npm install instead of ci and removing old node_modules
+# to handle optional dependency issues with rollup on ARM64.
+RUN rm -rf node_modules package-lock.json && npm install
 
 # Copy source code
 COPY . .

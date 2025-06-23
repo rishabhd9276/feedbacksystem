@@ -9,6 +9,8 @@ import AssignmentList from '../components/AssignmentList';
 import SubmissionUpload from '../components/SubmissionUpload';
 import { useLocation } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
+import { Tabs, Tab, Box, Paper, Card, CardContent, List, ListItem, Button, Typography, Divider, Stack } from '@mui/material';
+import { toast } from 'react-toastify';
 
 const EmployeeDashboard = () => {
   const location = useLocation();
@@ -88,6 +90,7 @@ const EmployeeDashboard = () => {
   const handlePeerAcknowledge = async (id) => {
     await axios.post(`/peer-feedback/${id}/acknowledge`);
     fetchPeerFeedbacks();
+    toast.success('Peer feedback acknowledged!');
   };
 
   const handleViewDetails = (feedback) => {
@@ -101,9 +104,9 @@ const EmployeeDashboard = () => {
   const handleRequestFeedback = async () => {
     try {
       await axios.post('/feedback/request');
-      alert('Feedback request sent successfully!');
+      toast.success('Feedback request sent successfully!');
     } catch (error) {
-      alert('Failed to send feedback request. You may not have a manager assigned.');
+      toast.error('Failed to send feedback request. You may not have a manager assigned.');
     }
   };
 
@@ -115,204 +118,133 @@ const EmployeeDashboard = () => {
     setActiveTab(tabName);
   };
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <Box p={4}><Typography>Loading...</Typography></Box>;
 
   return (
-    <div className="dashboard-container">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-        <h2>Employee Dashboard</h2>
-        <button onClick={handleRequestFeedback}>Request Feedback</button>
-      </div>
-
-      {/* Tab Navigation */}
-      <div style={{ display: 'flex', marginBottom: '1rem', borderBottom: '1px solid #ddd' }}>
-        <button 
-          onClick={() => handleTabClick('manager')}
-          style={{
-            padding: '0.5rem 1rem',
-            border: 'none',
-            background: activeTab === 'manager' ? '#007bff' : '#f8f9fa',
-            color: activeTab === 'manager' ? 'white' : '#333',
-            cursor: 'pointer',
-            borderBottom: activeTab === 'manager' ? '2px solid #007bff' : 'none'
-          }}
+    <Box sx={{ maxWidth: 1100, mx: 'auto', mt: 4 }}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" width="100%" mb={2}>
+        <Typography variant="h4">Employee Dashboard</Typography>
+        <Button variant="contained" onClick={handleRequestFeedback}>Request Feedback</Button>
+      </Box>
+      <Paper elevation={2} sx={{ mb: 3 }}>
+        <Tabs
+          value={activeTab}
+          onChange={(_, v) => setActiveTab(v)}
+          indicatorColor="primary"
+          textColor="primary"
+          variant="scrollable"
+          scrollButtons="auto"
         >
-          Manager Feedback
-        </button>
-        <button 
-          onClick={() => handleTabClick('peer')}
-          style={{
-            padding: '0.5rem 1rem',
-            border: 'none',
-            background: activeTab === 'peer' ? '#007bff' : '#f8f9fa',
-            color: activeTab === 'peer' ? 'white' : '#333',
-            cursor: 'pointer',
-            borderBottom: activeTab === 'peer' ? '2px solid #007bff' : 'none'
-          }}
-        >
-          Peer Feedback
-        </button>
-        <button 
-          onClick={() => handleTabClick('announcements')}
-          style={{
-            padding: '0.5rem 1rem',
-            border: 'none',
-            background: activeTab === 'announcements' ? '#007bff' : '#f8f9fa',
-            color: activeTab === 'announcements' ? 'white' : '#333',
-            cursor: 'pointer',
-            borderBottom: activeTab === 'announcements' ? '2px solid #007bff' : 'none'
-          }}
-        >
-          Announcements
-        </button>
-        <button 
-          onClick={() => handleTabClick('assignments')}
-          style={{
-            padding: '0.5rem 1rem',
-            border: 'none',
-            background: activeTab === 'assignments' ? '#007bff' : '#f8f9fa',
-            color: activeTab === 'assignments' ? 'white' : '#333',
-            cursor: 'pointer',
-            borderBottom: activeTab === 'assignments' ? '2px solid #007bff' : 'none'
-          }}
-        >
-          Assignments
-        </button>
-        <button 
-          onClick={() => handleTabClick('documents')}
-          style={{
-            padding: '0.5rem 1rem',
-            border: 'none',
-            background: activeTab === 'documents' ? '#007bff' : '#f8f9fa',
-            color: activeTab === 'documents' ? 'white' : '#333',
-            cursor: 'pointer',
-            borderBottom: activeTab === 'documents' ? '2px solid #007bff' : 'none'
-          }}
-        >
-          Documents
-        </button>
-      </div>
+          <Tab label="Manager Feedback" value="manager" />
+          <Tab label="Peer Feedback" value="peer" />
+          <Tab label="Announcements" value="announcements" />
+          <Tab label="Assignments" value="assignments" />
+          <Tab label="Documents" value="documents" />
+        </Tabs>
+      </Paper>
 
       {activeTab === 'manager' && (
-        <>
-          <h3>Manager Feedback Timeline</h3>
-          <ul>
+        <Box>
+          <Typography variant="h6" mb={2}>Manager Feedback Timeline</Typography>
+          <List>
             {timeline.map(fb => (
-              <li key={fb.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <strong>{fb.sentiment}</strong> - {new Date(fb.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
-                </div>
-                <div>
+              <ListItem key={fb.id} sx={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Box>
+                  <Typography fontWeight={600}>{fb.sentiment}</Typography> - {new Date(fb.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
+                </Box>
+                <Box>
                   {fb.acknowledged ? (
-                    <span style={{ color: '#2ecc71', fontWeight: 'bold' }}>Acknowledged</span>
+                    <Typography color="success.main" fontWeight={700}>Acknowledged</Typography>
                   ) : (
-                    <span style={{ fontStyle: 'italic', color: '#e67e22' }}>Pending</span>
+                    <Typography fontStyle="italic" color="warning.main">Pending</Typography>
                   )}
-                  <button onClick={() => handleViewDetails(fb)} style={{ marginLeft: '1rem' }}>
-                    View Details
-                  </button>
-                </div>
-              </li>
+                  <Button onClick={() => handleViewDetails(fb)} sx={{ ml: 2 }} variant="outlined" size="small">View Details</Button>
+                </Box>
+              </ListItem>
             ))}
-          </ul>
-        </>
+          </List>
+        </Box>
       )}
 
       {activeTab === 'peer' && (
-        <>
+        <Box>
           <PeerFeedbackForm onSuccess={handlePeerFeedbackSuccess} />
-          
-          <h3>Received Peer Feedback</h3>
+          <Typography variant="h6" mt={3} mb={2}>Received Peer Feedback</Typography>
           {peerFeedbacks.length === 0 ? (
-            <p>No peer feedback received yet.</p>
+            <Typography>No peer feedback received yet.</Typography>
           ) : (
-            <ul>
+            <List>
               {peerFeedbacks.map(fb => (
-                <li key={fb.id} style={{ 
-                  background: '#f8f9fa', 
-                  padding: '1rem', 
-                  marginBottom: '0.5rem', 
-                  borderRadius: '4px',
-                  border: '1px solid #dee2e6'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ marginBottom: '0.5rem' }}>
-                        <strong>{fb.sentiment}</strong> - {new Date(fb.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
+                <ListItem key={fb.id} sx={{ bgcolor: '#f8f9fa', mb: 1, borderRadius: 1, border: '1px solid #dee2e6', flexDirection: 'column', alignItems: 'flex-start' }}>
+                  <Box width="100%" display="flex" justifyContent="space-between" alignItems="flex-start">
+                    <Box flex={1}>
+                      <Box mb={1}>
+                        <Typography fontWeight={600}>{fb.sentiment}</Typography> - {new Date(fb.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
                         {fb.is_anonymous ? (
-                          <span style={{ color: '#6c757d', fontStyle: 'italic' }}> (Anonymous)</span>
+                          <Typography component="span" color="text.secondary" fontStyle="italic"> (Anonymous)</Typography>
                         ) : (
-                          <span style={{ color: '#007bff' }}> from {fb.from_employee_name}</span>
+                          <Typography component="span" color="primary.main"> from {fb.from_employee_name}</Typography>
                         )}
-                      </div>
-                      <div style={{ marginBottom: '0.5rem' }}>
-                        <strong>Strengths:</strong> {fb.strengths}
-                      </div>
-                      <div style={{ marginBottom: '0.5rem' }}>
-                        <strong>Areas to Improve:</strong> {fb.areas_to_improve}
-                      </div>
-                    </div>
-                    <div style={{ marginLeft: '1rem' }}>
+                      </Box>
+                      <Box mb={1}><strong>Strengths:</strong> {fb.strengths}</Box>
+                      <Box mb={1}><strong>Areas to Improve:</strong> {fb.areas_to_improve}</Box>
+                    </Box>
+                    <Box ml={2}>
                       {fb.acknowledged ? (
-                        <span style={{ color: '#2ecc71', fontWeight: 'bold' }}>Acknowledged</span>
+                        <Typography color="success.main" fontWeight={700}>Acknowledged</Typography>
                       ) : (
-                        <button 
+                        <Button 
                           onClick={() => handlePeerAcknowledge(fb.id)}
-                          style={{ 
-                            background: '#28a745', 
-                            color: 'white', 
-                            border: 'none', 
-                            padding: '0.25rem 0.5rem', 
-                            borderRadius: '4px',
-                            cursor: 'pointer'
-                          }}
+                          variant="contained"
+                          color="success"
+                          size="small"
                         >
                           Acknowledge
-                        </button>
+                        </Button>
                       )}
-                    </div>
-                  </div>
-                </li>
+                    </Box>
+                  </Box>
+                </ListItem>
               ))}
-            </ul>
+            </List>
           )}
-        </>
+        </Box>
       )}
 
       {activeTab === 'announcements' && (
-        <>
-          <h3>Team Announcements</h3>
+        <Box>
+          <Typography variant="h6" mb={2}>Team Announcements</Typography>
           <AnnouncementList 
             announcements={announcements} 
             isManager={false} 
             onUpdate={loadAnnouncements} 
           />
-        </>
+        </Box>
       )}
 
       {activeTab === 'assignments' && (
-        <>
-          <h3>My Assignments</h3>
+        <Box>
+          <Typography variant="h6" mb={2}>My Assignments</Typography>
           <AssignmentList 
             assignments={assignments} 
             isManager={false} 
             onUpdate={loadAssignments} 
             currentUser={user}
           />
-        </>
+        </Box>
       )}
 
       {activeTab === 'documents' && (
-        <>
-          <h3>My Documents</h3>
+        <Box>
+          <Typography variant="h6" mb={2}>My Documents</Typography>
           <DocumentUpload onSuccess={loadDocuments} />
-          <h4>Uploaded Documents</h4>
+          <Typography variant="subtitle1" mt={2}>Uploaded Documents</Typography>
           <DocumentList 
             documents={documents} 
             isManager={false} 
             onUpdate={loadDocuments} 
           />
-        </>
+        </Box>
       )}
 
       {selectedFeedback && (
@@ -322,7 +254,7 @@ const EmployeeDashboard = () => {
           onAcknowledge={handleAcknowledge}
         />
       )}
-    </div>
+    </Box>
   );
 };
 

@@ -5,6 +5,7 @@ import AssignmentCommentSection from './AssignmentCommentSection';
 const AssignmentList = ({ assignments, isManager, onUpdate, currentUser }) => {
   const [loading, setLoading] = useState({});
   const [expandedAssignment, setExpandedAssignment] = useState(null);
+  const [error, setError] = useState('');
 
   const handleDownload = async (assignmentId, filename) => {
     setLoading(prev => ({ ...prev, [assignmentId]: true }));
@@ -19,27 +20,24 @@ const AssignmentList = ({ assignments, isManager, onUpdate, currentUser }) => {
       link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
-      link.parentNode.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Failed to download assignment:', error);
-      alert('Failed to download assignment');
+      link.remove();
+    } catch (err) {
+      setError('Failed to download assignment.');
+      console.error(err);
     } finally {
       setLoading(prev => ({ ...prev, [assignmentId]: false }));
     }
   };
 
   const handleDelete = async (assignmentId) => {
-    if (!window.confirm('Are you sure you want to delete this assignment?')) {
-      return;
-    }
-    
-    try {
-      await axios.delete(`/assignments/${assignmentId}`);
-      onUpdate();
-    } catch (error) {
-      console.error('Failed to delete assignment:', error);
-      alert('Failed to delete assignment');
+    if (window.confirm('Are you sure you want to delete this assignment?')) {
+      try {
+        await axios.delete(`/assignments/${assignmentId}`);
+        if (onUpdate) onUpdate();
+      } catch (err) {
+        setError('Failed to delete assignment.');
+        console.error(err);
+      }
     }
   };
 

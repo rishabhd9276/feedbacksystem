@@ -108,6 +108,24 @@ const AnnouncementList = ({ announcements, isManager, onUpdate }) => {
     );
   }
 
+  const handleUpdate = async (id, form) => {
+    try {
+      await axios.patch(`/announcements/${id}`, form);
+      if (onUpdate) onUpdate();
+    } catch (err) {
+      console.error("Update failed", err);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await axios.delete(`/announcements/${id}`);
+      if (onUpdate) onUpdate();
+    } catch (err) {
+      console.error("Delete failed", err);
+    }
+  };
+
   return (
     <div className="announcement-list">
       {announcements.map(announcement => (

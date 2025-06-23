@@ -7,3 +7,5 @@ python-jose
 python-multipart
 email-validator
 reportlab 
+pytest
+httpx 

@@ -765,7 +765,7 @@ def delete_document(document_id: int, current_user: models.User = Depends(deps.g
     if not success:
         raise HTTPException(status_code=404, detail="Document not found or not authorized")
     
-    return {"message": "Document deleted successfully"}
+    return {"message": "Document deleted successfully"} 
 
 # --- Assignment Endpoints ---
 @app.post("/assignments/upload", response_model=schemas.AssignmentResponse)

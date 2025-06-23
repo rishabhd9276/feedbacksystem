@@ -1,15 +1,37 @@
-# Use official Python image
-FROM python:3.10-slim
+# --- Build Stage ---
+FROM python:3.10-slim as builder
 
-# Set work directory
 WORKDIR /app
 
-# Install dependencies
+# Install all dependencies, including for testing
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy app code
 COPY app ./app
+COPY tests ./tests
+
+
+# --- Test Stage ---
+FROM builder as tester
+
+WORKDIR /app
+
+# Run the tests
+CMD ["pytest"]
+
+
+# --- Final Stage ---
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Install only production dependencies
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy app code from the builder stage
+COPY --from=builder /app/app ./app
 
 # Create uploads directory and set permissions
 RUN mkdir -p uploads && chmod 755 uploads

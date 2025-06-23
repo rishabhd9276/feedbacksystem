@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import axios from '../api/axios';
+import { Card, CardContent, TextField, Button, Typography, Stack, Box, InputLabel } from '@mui/material';
+import { toast } from 'react-toastify';
 
 const SubmissionUpload = ({ assignmentId, assignmentTitle, onSuccess }) => {
   const [form, setForm] = useState({
@@ -7,7 +9,6 @@ const SubmissionUpload = ({ assignmentId, assignmentTitle, onSuccess }) => {
     description: ''
   });
   const [file, setFile] = useState(null);
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
@@ -21,7 +22,6 @@ const SubmissionUpload = ({ assignmentId, assignmentTitle, onSuccess }) => {
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
-      // Allow multiple file types for submissions
       const allowedTypes = [
         'application/pdf',
         'application/msword',
@@ -31,57 +31,48 @@ const SubmissionUpload = ({ assignmentId, assignmentTitle, onSuccess }) => {
         'image/png',
         'image/gif'
       ];
-      
       if (!allowedTypes.includes(selectedFile.type)) {
-        setError('File type not allowed. Please upload PDF, Word, text, or image files.');
+        toast.error('File type not allowed. Please upload PDF, Word, text, or image files.');
         setFile(null);
         return;
       }
-      
       if (selectedFile.size > 10 * 1024 * 1024) {
-        setError('File size must be less than 10MB');
+        toast.error('File size must be less than 10MB');
         setFile(null);
         return;
       }
-      
       setFile(selectedFile);
-      setError('');
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!file) {
-      setError('Please select a file');
+      toast.error('Please select a file');
       return;
     }
-
     if (!form.title.trim()) {
-      setError('Please enter a submission title');
+      toast.error('Please enter a submission title');
       return;
     }
-
-    setError('');
     setLoading(true);
-
     try {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('assignment_id', assignmentId);
       formData.append('title', form.title);
       formData.append('description', form.description || '');
-
       await axios.post('/submissions/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
-
       setForm({ title: '', description: '' });
       setFile(null);
-      onSuccess();
+      toast.success('Submission uploaded successfully!');
+      if (onSuccess) onSuccess();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to upload submission');
+      toast.error(err.response?.data?.detail || 'Failed to upload submission');
     } finally {
       setLoading(false);
     }
@@ -96,59 +87,55 @@ const SubmissionUpload = ({ assignmentId, assignmentTitle, onSuccess }) => {
   };
 
   return (
-    <div className="submission-upload">
-      <h4>Submit Work for: {assignmentTitle}</h4>
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label htmlFor="title">Submission Title:</label>
-          <input
-            type="text"
-            id="title"
-            name="title"
-            value={form.title}
-            onChange={handleChange}
-            required
-            placeholder="Enter submission title"
-          />
-        </div>
-        
-        <div>
-          <label htmlFor="description">Description (Optional):</label>
-          <textarea
-            id="description"
-            name="description"
-            value={form.description}
-            onChange={handleChange}
-            placeholder="Describe your submission"
-            rows="3"
-          />
-        </div>
-        
-        <div>
-          <label htmlFor="file">Select Submission File:</label>
-          <input
-            type="file"
-            id="file"
-            accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif"
-            onChange={handleFileChange}
-            required
-          />
-          {file && (
-            <div className="file-info">
-              <p>Selected: {file.name}</p>
-              <p>Size: {formatFileSize(file.size)}</p>
-              <p>Type: {file.type}</p>
-            </div>
-          )}
-        </div>
-        
-        <button type="submit" disabled={loading || !file}>
-          {loading ? 'Uploading...' : 'Submit Work'}
-        </button>
-        
-        {error && <div className="error">{error}</div>}
-      </form>
-    </div>
+    <Card sx={{ mb: 3 }}>
+      <CardContent>
+        <Typography variant="h6" gutterBottom>Submit Work for: {assignmentTitle}</Typography>
+        <Box component="form" onSubmit={handleSubmit} noValidate>
+          <Stack spacing={2}>
+            <TextField
+              label="Submission Title"
+              name="title"
+              value={form.title}
+              onChange={handleChange}
+              required
+              fullWidth
+              placeholder="Enter submission title"
+            />
+            <TextField
+              label="Description (Optional)"
+              name="description"
+              value={form.description}
+              onChange={handleChange}
+              placeholder="Describe your submission"
+              multiline
+              rows={3}
+              fullWidth
+            />
+            <Box>
+              <InputLabel htmlFor="file">Select Submission File</InputLabel>
+              <input
+                type="file"
+                id="file"
+                accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif"
+                onChange={handleFileChange}
+                required
+                style={{ marginTop: 8 }}
+              />
+              {file && (
+                <Box mt={1}>
+                  <Typography variant="body2">Selected: {file.name}</Typography>
+                  <Typography variant="body2">Size: {formatFileSize(file.size)}</Typography>
+                  <Typography variant="body2">Type: {file.type}</Typography>
+                </Box>
+              )}
+            </Box>
+            <Button type="submit" variant="contained" disabled={loading || !file}>
+              {loading ? 'Uploading...' : 'Submit Work'}
+            </Button>
+          </Stack>
+        </Box>
+      </CardContent>
+    </Card>
   );
 };
 

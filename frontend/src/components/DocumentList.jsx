@@ -220,6 +220,114 @@ const DocumentItem = ({ document: docItem, isManager, onUpdate, onDelete }) => {
 };
 
 const DocumentList = ({ documents, isManager, onUpdate }) => {
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({ title: '', description: '', is_public: false });
+  const [error, setError] = useState('');
+
+  const handleEdit = (doc) => {
+    setEditing(doc.id);
+    setForm({ title: doc.title, description: doc.description, is_public: doc.is_public });
+  };
+
+  const handleUpdate = async (e, docId) => {
+    e.preventDefault();
+    try {
+      await axios.patch(`/documents/${docId}`, form);
+      setEditing(null);
+      if (onUpdate) onUpdate();
+    } catch (err) {
+      setError('Failed to update document.');
+      console.error(err);
+    }
+  };
+
+  const handleDelete = async (docId) => {
+    if (window.confirm('Are you sure you want to delete this document?')) {
+      try {
+        await axios.delete(`/documents/${docId}`);
+        if (onUpdate) onUpdate();
+      } catch (err) {
+        setError('Failed to delete document.');
+        console.error(err);
+      }
+    }
+  };
+
+  const handleDownload = async (docId, filename) => {
+    try {
+      console.log('Starting download for document:', docId);
+      
+      const response = await axios.get(`/documents/${docId}/download`, {
+        responseType: 'blob'
+      });
+      
+      console.log('Download response:', response);
+      console.log('Response data type:', typeof response.data);
+      console.log('Response data size:', response.data.size);
+      
+      if (!response.data || response.data.size === 0) {
+        throw new Error('Empty response data');
+      }
+      
+      // Create blob with proper MIME type
+      const blob = new Blob([response.data], { 
+        type: response.headers['content-type'] || 'application/pdf' 
+      });
+      
+      console.log('Created blob:', blob);
+      console.log('Blob size:', blob.size);
+      
+      // Use a more reliable download method
+      const url = window.URL.createObjectURL(blob);
+      
+      // Create download link using vanilla JavaScript
+      const downloadLink = document.createElement('a');
+      downloadLink.href = url;
+      downloadLink.download = filename || 'document.pdf';
+      downloadLink.style.display = 'none';
+      
+      // Append to body and trigger download
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      
+      // Cleanup after a short delay
+      setTimeout(() => {
+        if (document.body.contains(downloadLink)) {
+          document.body.removeChild(downloadLink);
+        }
+        window.URL.revokeObjectURL(url);
+      }, 100);
+      
+      console.log('Download completed successfully');
+    } catch (err) {
+      console.error('Download error:', err);
+      console.error('Error response:', err.response);
+      
+      // Fallback download method
+      try {
+        console.log('Trying fallback download method...');
+        const response = await axios.get(`/documents/${docId}/download`, {
+          responseType: 'blob'
+        });
+        
+        const blob = new Blob([response.data]);
+        const url = window.URL.createObjectURL(blob);
+        
+        // Use window.open as fallback
+        window.open(url, '_blank');
+        
+        setTimeout(() => {
+          window.URL.revokeObjectURL(url);
+        }, 1000);
+        
+        console.log('Fallback download completed');
+      } catch (fallbackErr) {
+        console.error('Fallback download also failed:', fallbackErr);
+        alert('Failed to download document: ' + (err.message || 'Unknown error'));
+      }
+    }
+  };
+
   if (!documents || documents.length === 0) {
     return (
       <div className="document-list empty">

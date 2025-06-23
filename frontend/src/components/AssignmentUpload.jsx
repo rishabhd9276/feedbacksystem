@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import axios from '../api/axios';
+import { Card, CardContent, TextField, Button, Typography, Stack, Box, InputLabel } from '@mui/material';
+import { toast } from 'react-toastify';
 
-const AssignmentUpload = ({ onSuccess }) => {
+const AssignmentUpload = ({ onUploadSuccess }) => {
   const [form, setForm] = useState({
     title: '',
     description: '',
     due_date: ''
   });
   const [file, setFile] = useState(null);
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
@@ -22,7 +23,6 @@ const AssignmentUpload = ({ onSuccess }) => {
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
-      // Allow multiple file types for assignments
       const allowedTypes = [
         'application/pdf',
         'application/msword',
@@ -32,39 +32,27 @@ const AssignmentUpload = ({ onSuccess }) => {
         'image/png',
         'image/gif'
       ];
-      
       if (!allowedTypes.includes(selectedFile.type)) {
-        setError('File type not allowed. Please upload PDF, Word, text, or image files.');
+        toast.error('File type not allowed. Please upload PDF, Word, text, or image files.');
         setFile(null);
         return;
       }
-      
       if (selectedFile.size > 10 * 1024 * 1024) {
-        setError('File size must be less than 10MB');
+        toast.error('File size must be less than 10MB');
         setFile(null);
         return;
       }
-      
       setFile(selectedFile);
-      setError('');
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!file) {
-      setError('Please select a file');
+    if (!file || !form.title) {
+      toast.error('File and title are required.');
       return;
     }
-
-    if (!form.title.trim()) {
-      setError('Please enter an assignment title');
-      return;
-    }
-
-    setError('');
     setLoading(true);
-
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -73,18 +61,19 @@ const AssignmentUpload = ({ onSuccess }) => {
       if (form.due_date) {
         formData.append('due_date', form.due_date);
       }
-
       await axios.post('/assignments/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
-
       setForm({ title: '', description: '', due_date: '' });
       setFile(null);
-      onSuccess();
+      toast.success('Assignment uploaded successfully!');
+      if (onUploadSuccess) {
+        onUploadSuccess();
+      }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to upload assignment');
+      toast.error(err.response?.data?.detail || 'Failed to upload assignment');
     } finally {
       setLoading(false);
     }
@@ -99,70 +88,64 @@ const AssignmentUpload = ({ onSuccess }) => {
   };
 
   return (
-    <div className="assignment-upload">
-      <h3>Upload Assignment</h3>
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label htmlFor="title">Assignment Title:</label>
-          <input
-            type="text"
-            id="title"
-            name="title"
-            value={form.title}
-            onChange={handleChange}
-            required
-            placeholder="Enter assignment title"
-          />
-        </div>
-        
-        <div>
-          <label htmlFor="description">Description (Optional):</label>
-          <textarea
-            id="description"
-            name="description"
-            value={form.description}
-            onChange={handleChange}
-            placeholder="Describe the assignment requirements"
-            rows="3"
-          />
-        </div>
-        
-        <div>
-          <label htmlFor="due_date">Due Date (Optional):</label>
-          <input
-            type="datetime-local"
-            id="due_date"
-            name="due_date"
-            value={form.due_date}
-            onChange={handleChange}
-          />
-        </div>
-        
-        <div>
-          <label htmlFor="file">Select Assignment File:</label>
-          <input
-            type="file"
-            id="file"
-            accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif"
-            onChange={handleFileChange}
-            required
-          />
-          {file && (
-            <div className="file-info">
-              <p>Selected: {file.name}</p>
-              <p>Size: {formatFileSize(file.size)}</p>
-              <p>Type: {file.type}</p>
-            </div>
-          )}
-        </div>
-        
-        <button type="submit" disabled={loading || !file}>
-          {loading ? 'Uploading...' : 'Upload Assignment'}
-        </button>
-        
-        {error && <div className="error">{error}</div>}
-      </form>
-    </div>
+    <Card sx={{ mb: 3 }}>
+      <CardContent>
+        <Typography variant="h6" gutterBottom>Upload Assignment</Typography>
+        <Box component="form" onSubmit={handleSubmit} noValidate>
+          <Stack spacing={2}>
+            <TextField
+              label="Assignment Title"
+              name="title"
+              value={form.title}
+              onChange={handleChange}
+              required
+              fullWidth
+              placeholder="Enter assignment title"
+            />
+            <TextField
+              label="Description (Optional)"
+              name="description"
+              value={form.description}
+              onChange={handleChange}
+              placeholder="Describe the assignment requirements"
+              multiline
+              rows={3}
+              fullWidth
+            />
+            <TextField
+              label="Due Date (Optional)"
+              name="due_date"
+              type="datetime-local"
+              value={form.due_date}
+              onChange={handleChange}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+            />
+            <Box>
+              <InputLabel htmlFor="file">Select Assignment File</InputLabel>
+              <input
+                type="file"
+                id="file"
+                accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif"
+                onChange={handleFileChange}
+                required
+                style={{ marginTop: 8 }}
+              />
+              {file && (
+                <Box mt={1}>
+                  <Typography variant="body2">Selected: {file.name}</Typography>
+                  <Typography variant="body2">Size: {formatFileSize(file.size)}</Typography>
+                  <Typography variant="body2">Type: {file.type}</Typography>
+                </Box>
+              )}
+            </Box>
+            <Button type="submit" variant="contained" disabled={loading || !file}>
+              {loading ? 'Uploading...' : 'Upload Assignment'}
+            </Button>
+          </Stack>
+        </Box>
+      </CardContent>
+    </Card>
   );
 };
 
