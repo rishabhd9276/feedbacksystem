@@ -1,6 +1,22 @@
 # Feedback System
 
-A comprehensive employee feedback management system built with React frontend and FastAPI backend, featuring document uploads, announcements, peer feedback, and more.
+A comprehensive employee feedback management system built with a modern React (Material-UI) frontend and FastAPI backend, featuring document uploads, announcements, assignments, peer feedback, real-time notifications, and more.
+
+---
+
+## 🆕 What's New (2024)
+- **Modern Material-UI Frontend:** All dashboards and forms use Material-UI for a clean, responsive, and professional look.
+- **Notification Popover with Dismiss:** Notification bell opens a popover with a list of notifications. Each notification can be individually dismissed (with an X), keeping the list tidy.
+- **Assignment Management:**
+  - Managers can upload assignments (with title, description, due date, and file).
+  - Employees are notified, can view assignments, and submit their work.
+  - Submission upload and tracking for each assignment.
+- **Assignment Comments:**
+  - Transparent comment section for each assignment (employees and managers can discuss, ask questions, and get notified of new comments).
+- **Toast Notifications:** All user actions (upload, submit, comment, errors) use toast notifications for instant feedback.
+- **Backend Dockerfile Fix:** Docker image now installs all dependencies correctly (no more missing 'click' or other packages).
+
+---
 
 ## 🚀 Features
 
@@ -17,8 +33,14 @@ A comprehensive employee feedback management system built with React frontend an
   - Feedback acknowledgment system
   - Sentiment analysis tracking
 
+- **Assignment Management**
+  - Managers upload assignments (with file, title, description, due date)
+  - Employees receive notifications and can submit their work
+  - Submission tracking and file upload
+  - Comment section for assignment discussion
+
 - **Document Management**
-  - PDF document uploads
+  - PDF/document uploads
   - Public/private document visibility
   - Document download functionality
   - File size validation (max 10MB)
@@ -29,14 +51,15 @@ A comprehensive employee feedback management system built with React frontend an
   - Team-specific announcements
 
 - **Notifications**
-  - Real-time notifications
+  - Real-time notifications for all major actions
+  - Notification popover with dismiss (X) for each notification
   - Read/unread status tracking
-  - Automatic notifications for various actions
+  - Automatic notifications for assignments, submissions, comments, announcements, and more
 
 - **Comments System**
-  - Comments on feedback
+  - Comments on feedback and assignments
   - Edit and delete functionality
-  - Manager notifications for comments
+  - Manager and employee notifications for new comments
 
 ### Additional Features
 - **Dashboard Analytics**
@@ -49,13 +72,20 @@ A comprehensive employee feedback management system built with React frontend an
   - Export all feedback for an employee
   - Professional PDF formatting
 
+- **Modern UI/UX**
+  - Material-UI components for all forms, lists, and navigation
+  - Toast notifications for all user actions
+  - Responsive and accessible design
+
+---
+
 ## 🛠️ Tech Stack
 
 ### Frontend
-- **React** - UI framework
+- **React** + **Material-UI** (MUI)
 - **Axios** - HTTP client
-- **CSS** - Styling
 - **Vite** - Build tool
+- **react-toastify** - Toast notifications
 
 ### Backend
 - **FastAPI** - Python web framework
@@ -69,32 +99,7 @@ A comprehensive employee feedback management system built with React frontend an
 - **Docker** - Containerization
 - **Git** - Version control
 
-## 📁 Project Structure
-
-```
-feedback-system/
-├── frontend/                 # React frontend
-│   ├── src/
-│   │   ├── components/      # React components
-│   │   ├── api/            # API configuration
-│   │   └── App.jsx         # Main app component
-│   ├── package.json
-│   └── vite.config.js
-├── backend/                  # FastAPI backend
-│   ├── app/
-│   │   ├── models.py       # Database models
-│   │   ├── schemas.py      # Pydantic schemas
-│   │   ├── crud.py         # Database operations
-│   │   ├── main.py         # FastAPI app
-│   │   ├── auth.py         # Authentication
-│   │   ├── deps.py         # Dependencies
-│   │   └── database.py     # Database setup
-│   ├── uploads/            # Document storage
-│   ├── requirements.txt
-│   └── Dockerfile
-├── README.md
-└── .gitignore
-```
+---
 
 ## 🚀 Quick Start
 
@@ -109,21 +114,15 @@ feedback-system/
    ```bash
    cd backend
    ```
-
 2. **Install Python dependencies:**
    ```bash
    pip install -r requirements.txt
    ```
-
 3. **Run with Docker (Recommended):**
    ```bash
-   # Build Docker image
    docker build -t feedback-backend .
-   
-   # Run with volume mount for uploads
    docker run -p 8000:8000 -v "$(pwd)/uploads:/app/uploads" feedback-backend
    ```
-
 4. **Or run directly:**
    ```bash
    python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
@@ -135,21 +134,20 @@ feedback-system/
    ```bash
    cd frontend
    ```
-
 2. **Install dependencies:**
    ```bash
    npm install
    ```
-
 3. **Start development server:**
    ```bash
    npm run dev
    ```
-
 4. **Open in browser:**
    ```
    http://localhost:5173
    ```
+
+---
 
 ## 📖 API Documentation
 
@@ -157,39 +155,45 @@ Once the backend is running, visit:
 - **Interactive API Docs:** http://localhost:8000/docs
 - **Alternative API Docs:** http://localhost:8000/redoc
 
-## 🔐 Authentication
+---
 
-The system uses JWT tokens for authentication. Users can register and login through the API endpoints:
-
-- `POST /auth/register` - User registration
-- `POST /auth/login` - User login
-
-## 👥 User Roles
+## 👥 User Roles & Permissions
 
 ### Manager
-- Create and manage feedback for team members
+- Create/manage feedback for team members
+- Upload assignments and view submissions
 - View team analytics and insights
 - Create announcements for the team
 - View public documents from team members
 - Export feedback reports
+- Participate in assignment comment discussions
 
 ### Employee
 - View and acknowledge received feedback
 - Upload and manage documents
 - Give peer feedback to team members
 - View team announcements
-- Add comments to feedback
+- View and submit assignments
+- Add comments to assignments and feedback
+
+---
 
 ## 📊 Features in Detail
 
 ### Feedback System
-- **Manager Feedback:** Managers can provide structured feedback with strengths, areas for improvement, and sentiment analysis
+- **Manager Feedback:** Structured feedback with strengths, areas for improvement, and sentiment analysis
 - **Peer Feedback:** Employees can give feedback to their team members
 - **Anonymous Options:** Both manager and peer feedback can be anonymous
 - **Acknowledgment:** Employees must acknowledge feedback before managers can update it
 
+### Assignment Management
+- **Upload:** Managers upload assignments with file, title, description, and due date
+- **Submission:** Employees submit work for assignments (with file and description)
+- **Comments:** Transparent comment section for assignment discussion
+- **Notifications:** Real-time notifications for new assignments, submissions, and comments
+
 ### Document Management
-- **Upload:** Employees can upload PDF documents
+- **Upload:** Employees can upload PDF/documents
 - **Visibility:** Documents can be marked as public (visible to manager) or private
 - **Download:** Secure document download with proper authorization
 - **Storage:** Files are stored in the `uploads/` directory
@@ -198,6 +202,14 @@ The system uses JWT tokens for authentication. Users can register and login thro
 - **Team-specific:** Managers can create announcements visible only to their team
 - **Status Management:** Announcements can be activated/deactivated
 - **Notifications:** Team members receive notifications for new announcements
+
+### Notifications
+- **Popover UI:** Notification bell opens a popover with a list of notifications
+- **Dismiss:** Each notification can be individually dismissed (X)
+- **Read/Unread:** Read/unread status is tracked and updated
+- **Toast Feedback:** All actions (upload, submit, comment, errors) use toast notifications for instant feedback
+
+---
 
 ## 🔧 Configuration
 
@@ -211,6 +223,8 @@ DATABASE_URL=sqlite:///./feedback_system.db
 
 ### Database
 The system uses SQLite by default. The database file is created automatically on first run.
+
+---
 
 ## 🐳 Docker Deployment
 
@@ -228,6 +242,8 @@ docker build -t feedback-frontend .
 docker run -p 3000:3000 feedback-frontend
 ```
 
+---
+
 ## 🤝 Contributing
 
 1. Fork the repository
@@ -235,6 +251,8 @@ docker run -p 3000:3000 feedback-frontend
 3. Make your changes
 4. Add tests if applicable
 5. Submit a pull request
+
+---
 
 ## 📝 License
 
@@ -250,8 +268,9 @@ This project is licensed under the MIT License.
 - FastAPI for the excellent web framework
 - React for the frontend framework
 - SQLAlchemy for the ORM
+- Material-UI for the modern UI components
 - All contributors and users of this system
 
 ---
 
-**Note:** This is a comprehensive feedback management system designed for modern workplaces. It includes all the essential features needed for effective employee feedback and communication. 
+**Note:** This is a comprehensive feedback management system designed for modern workplaces. It includes all the essential features needed for effective employee feedback, assignment management, and communication. 
