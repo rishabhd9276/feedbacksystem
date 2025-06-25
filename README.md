@@ -273,4 +273,4 @@ This project is licensed under the MIT License.
 
 ---
 
-**Note:** This is a comprehensive feedback management system designed for modern workplaces. It includes all the essential features needed for effective employee feedback, assignment management, and communication. 
+**Note:** This is a comprehensive feedback management system designed for modern workplaces. It includes all the essential features needed for effective employee feedback, assignment management, and communication.
