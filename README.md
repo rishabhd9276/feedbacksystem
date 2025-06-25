@@ -265,7 +265,7 @@ This project is licensed under the MIT License.
 ## 👨‍💻 Author
 
 **Rishabh Dubey**
-- GitHub: [@rishabhd9276](https://github.com/rishabhd9276)
+- GitHub: [@rishabhd491](https://github.com/rishabhd491)
 
 ## 🙏 Acknowledgments
 
